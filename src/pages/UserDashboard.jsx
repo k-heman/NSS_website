@@ -24,6 +24,12 @@ export default function UserDashboard() {
   const username = currentUser?.email?.replace('@nssrguktb.com', '').toUpperCase();
 
   useEffect(() => {
+    // We can skip fetching attendance entirely if the user is an admin
+    if (userRole === 'admin') {
+      setLoadingAttendance(false);
+      return;
+    }
+
     const fetchAttendance = async () => {
       if (!username) return;
       try {
@@ -70,7 +76,7 @@ export default function UserDashboard() {
     };
 
     fetchAttendance();
-  }, [username]);
+  }, [username, userRole]);
 
   return (
     <div className="app-container">
@@ -121,6 +127,7 @@ export default function UserDashboard() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: '24px'
           }}>
+            {/* Current Status Card - VISIBLE TO EVERYONE */}
             <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
               <Activity color="var(--tab-underline)" />
               <div>
@@ -130,47 +137,53 @@ export default function UserDashboard() {
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-              <Clock color="var(--active-green)" />
-              <div>
-                <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>NSS Hours</h3>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                  <span style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--active-green)' }}>
-                    {loadingAttendance ? '-' : (attendance?.totalHours || 0)}
-                  </span>
-                  <span style={{ color: 'var(--text-muted)' }}>Hrs completed</span>
+            {/* VOLUNTEER SPECIFIC CARDS - HIDDEN FROM ADMINS */}
+            {userRole !== 'admin' && (
+              <>
+                <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+                  <Clock color="var(--active-green)" />
+                  <div>
+                    <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>NSS Hours</h3>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--active-green)' }}>
+                        {loadingAttendance ? '-' : (attendance?.totalHours || 0)}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Hrs completed</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-              <Calendar color="var(--primary-blue)" />
-              <div>
-                <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>Attendance</h3>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                  <span style={{ fontSize: '2.5rem', fontWeight: 'bold', color: attendance?.percentage >= 75 ? 'var(--active-green)' : (attendance?.percentage < 50 ? 'var(--error-red)' : '#fbc02d') }}>
-                    {loadingAttendance ? '-' : `${attendance?.percentage || 0}%`}
-                  </span>
+                <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+                  <Calendar color="var(--primary-blue)" />
+                  <div>
+                    <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>Attendance</h3>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontSize: '2.5rem', fontWeight: 'bold', color: attendance?.percentage >= 75 ? 'var(--active-green)' : (attendance?.percentage < 50 ? 'var(--error-red)' : '#fbc02d') }}>
+                        {loadingAttendance ? '-' : `${attendance?.percentage || 0}%`}
+                      </span>
+                    </div>
+                    {!loadingAttendance && attendance && (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        {attendance.presentCount} / {attendance.totalSessions} Activities Attended
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {!loadingAttendance && attendance && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    {attendance.presentCount} / {attendance.totalSessions} Activities Attended
-                  </p>
-                )}
-              </div>
-            </div>
 
-            <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-              <Award color="#fbc02d" />
-              <div>
-                <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>Unit Number</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Unit 5</p>
-              </div>
-            </div>
+                <div className="glass-panel" style={{ padding: '24px', boxShadow: 'none', border: '1px solid var(--gray-border)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+                  <Award color="#fbc02d" />
+                  <div>
+                    <h3 style={{ color: 'var(--primary-blue)', marginBottom: '10px' }}>Unit Number</h3>
+                    <p style={{ color: 'var(--text-muted)' }}>Unit 5</p>
+                  </div>
+                </div>
+              </  >
+            )}
           </div>
         </motion.div>
 
-        {!loadingAttendance && attendance && attendance.records && attendance.records.length > 0 && (
+        {/* ATTENDANCE HISTORY - HIDDEN FROM ADMINS */}
+        {userRole !== 'admin' && !loadingAttendance && attendance && attendance.records && attendance.records.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

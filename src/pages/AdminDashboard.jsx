@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
-import { Search, ShieldAlert, LogOut, LayoutDashboard, UserCheck, ShieldCheck } from 'lucide-react';
+// Added RefreshCw for the update button icon
+import { Search, ShieldAlert, LogOut, LayoutDashboard, RefreshCw } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { currentUser, userRole, logout } = useAuth();
@@ -15,6 +16,9 @@ export default function AdminDashboard() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // New state to track the dropdown selections before saving
+  const [selectedRoles, setSelectedRoles] = useState({});
 
   const handleLogout = async () => {
     try {
@@ -30,6 +34,7 @@ export default function AdminDashboard() {
     setError('');
     setSuccess('');
     setSearchResults([]);
+    setSelectedRoles({}); // Reset dropdowns on new search
 
     if (!searchUsername.trim()) {
       return setError('Please enter a username to search.');
@@ -61,22 +66,35 @@ export default function AdminDashboard() {
     setSearchLoading(false);
   };
 
-  const grantAdminRole = async (userId) => {
+  // Helper to handle dropdown changes locally
+  const handleRoleSelection = (userId, role) => {
+    setSelectedRoles(prev => ({ ...prev, [userId]: role }));
+  };
+
+  // Updated to accept any role ('admin' or 'user')
+  const updateUserRole = async (userId, newRole) => {
     setError('');
     setSuccess('');
     try {
       await updateDoc(doc(db, 'users', userId), {
-        role: 'admin'
+        role: newRole
       });
-      setSuccess(`Successfully granted admin privileges to ${userId}.`);
+      setSuccess(`Successfully updated role for user to ${newRole.toUpperCase()}.`);
 
       // Update local state to reflect UI change instantly
       setSearchResults(prev => prev.map(u =>
-        u.id === userId ? { ...u, role: 'admin' } : u
+        u.id === userId ? { ...u, role: newRole } : u
       ));
+
+      // Clear the pending selection for this specific user
+      setSelectedRoles(prev => {
+        const updated = { ...prev };
+        delete updated[userId];
+        return updated;
+      });
     } catch (err) {
-      console.error('Error granting role', err);
-      setError(`Failed to grant admin privileges to ${userId}.`);
+      console.error('Error updating role', err);
+      setError(`Failed to update role for user.`);
     }
   };
 
@@ -116,7 +134,7 @@ export default function AdminDashboard() {
       >
         <h2>Role Management</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
-          Search for users by their username (ID) to grant them administrator privileges.
+          Search for users by their username (ID) to manage their access privileges.
         </p>
 
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -158,38 +176,64 @@ export default function AdminDashboard() {
             Search Results ({searchResults.length})
           </h3>
           <div className="user-list">
-            {searchResults.map((user) => (
-              <motion.div
-                key={user.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="user-card"
-              >
-                <div className="user-info">
-                  <h4>{user.name || user.username} {user.username && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>({user.username})</span>}</h4>
-                  <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
-                    <p>Role: <span style={{ textTransform: 'capitalize', color: 'var(--white)' }}>{user.role || 'User'}</span></p>
-                    {user.batch && <p>Batch: <span style={{ color: 'var(--white)' }}>{user.batch}</span></p>}
-                  </div>
-                </div>
+            {searchResults.map((user) => {
+              const currentRole = user.role || 'user';
+              const pendingRole = selectedRoles[user.id] || currentRole;
+              const hasRoleChanged = pendingRole !== currentRole;
 
-                <div>
-                  {user.role === 'admin' ? (
-                    <div className="badge-admin" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ShieldCheck size={16} /> Admin
+              return (
+                <motion.div
+                  key={user.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="user-card"
+                >
+                  <div className="user-info">
+                    <h4>{user.name || user.username} {user.username && <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>({user.username})</span>}</h4>
+                    <div style={{ display: 'flex', gap: '16px', marginTop: '4px' }}>
+                      <p>Current Role: <span style={{ textTransform: 'capitalize', color: currentRole === 'admin' ? 'var(--accent)' : 'var(--white)' }}>{currentRole}</span></p>
+                      {user.batch && <p>Batch: <span style={{ color: 'var(--white)' }}>{user.batch}</span></p>}
                     </div>
-                  ) : (
+                  </div>
+
+                  {/* Dropdown & Update Button Section */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <select
+                      value={pendingRole}
+                      onChange={(e) => handleRoleSelection(user.id, e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        minWidth: '100px'
+                      }}
+                    >
+                      <option value="user" style={{ color: 'black' }}>User</option>
+                      <option value="admin" style={{ color: 'black' }}>Admin</option>
+                    </select>
+
                     <button
                       className="btn-secondary"
-                      onClick={() => grantAdminRole(user.id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                      onClick={() => updateUserRole(user.id, pendingRole)}
+                      disabled={!hasRoleChanged}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: hasRoleChanged ? 1 : 0.5,
+                        cursor: hasRoleChanged ? 'pointer' : 'not-allowed'
+                      }}
                     >
-                      <UserCheck size={16} /> Grant Admin
+                      <RefreshCw size={16} /> Update Role
                     </button>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
       )}
