@@ -53,7 +53,7 @@ export default function Signup() {
       <div className="auth-content">
         <div className="auth-header">
           <h1 className="auth-title">Create Account</h1>
-          <p className="auth-subtitle">Verify your ID to join the NSS program</p>
+          <p className="auth-subtitle">Verify your details to confirm as you are NSS Volunteer</p>
         </div>
 
         <AnimatePresence mode="wait">
